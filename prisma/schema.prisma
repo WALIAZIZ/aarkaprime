@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  name                  String?
+  company               String?
+  password              String
+  role                  String   @default("user")
+  plan                  String   @default("free")
+  monthlyGenerationsUsed  Int    @default(0)
+  monthlyGenerationsLimit Int    @default(10)
+  activeListings        Int      @default(0)
+  maxListings           Int      @default(3)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  properties            Property[]
+  generatedContent      GeneratedContent[]
+  leads                 Lead[]
+}
+
+model Property {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  title         String
+  propertyType  String   @default("apartment")
+  location      String
+  neighborhood  String?
+  price         Float
+  bedrooms      Int      @default(0)
+  bathrooms     Int      @default(0)
+  areaSqm       Float?
+  features      String
+  description   String?
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  generatedContent GeneratedContent[]
+  leads         Lead[]
+}
+
+model GeneratedContent {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id])
+  contentType String
+  platform    String?
+  language    String   @default("english")
+  title       String
+  body        String
+  tokensUsed  Int      @default(0)
+  aiModel     String   @default("deepseek")
+  createdAt   DateTime @default(now())
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id])
+  name        String
+  email       String?
+  phone       String?
+  message     String?
+  source      String   @default("website")
+  status      String   @default("new")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
