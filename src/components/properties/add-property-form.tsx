@@ -128,7 +128,8 @@ export function AddPropertyForm() {
         `/api/properties/${selectedPropertyId}?userId=${user.id}`
       );
       if (!res.ok) throw new Error('Failed to fetch property');
-      const data: PropertyData = await res.json();
+      const json = await res.json();
+      const data: PropertyData = json.property ?? json;
 
       const parsedFeatures: string[] = (() => {
         try {

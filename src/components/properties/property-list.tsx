@@ -147,7 +147,8 @@ export function PropertyList() {
     try {
       const res = await fetch(`/api/properties?userId=${user.id}`);
       if (!res.ok) throw new Error('Failed to fetch properties');
-      const data: Property[] = await res.json();
+      const json = await res.json();
+      const data: Property[] = Array.isArray(json) ? json : json.properties ?? [];
       setProperties(data);
     } catch (err) {
       setError(

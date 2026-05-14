@@ -48,15 +48,15 @@ interface GeneratedContent {
 
 const contentTypes = [
   { value: 'description', label: 'Description' },
-  { value: 'social-media', label: 'Social Media Posts' },
-  { value: 'whatsapp', label: 'WhatsApp Messages' },
-  { value: 'email', label: 'Email Campaign' },
-  { value: 'ad-copy', label: 'Ad Copy' },
+  { value: 'social_post', label: 'Social Media Posts' },
+  { value: 'whatsapp_msg', label: 'WhatsApp Messages' },
+  { value: 'email_campaign', label: 'Email Campaign' },
+  { value: 'ad_copy', label: 'Ad Copy' },
 ];
 
 const languages = [
-  { value: 'en', label: 'English' },
-  { value: 'sw', label: 'Swahili' },
+  { value: 'english', label: 'English' },
+  { value: 'swahili', label: 'Swahili' },
 ];
 
 export function GeneratePanel() {
@@ -65,6 +65,7 @@ export function GeneratePanel() {
     selectedPropertyId,
     isGenerating,
     setGenerating,
+    setUser,
     addToast,
   } = useAppStore();
 
@@ -73,7 +74,7 @@ export function GeneratePanel() {
     selectedPropertyId || ''
   );
   const [contentType, setContentType] = useState<string>('');
-  const [language, setLanguage] = useState<string>('en');
+  const [language, setLanguage] = useState<string>('english');
   const [results, setResults] = useState<GeneratedContent[]>([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
 
@@ -141,6 +142,13 @@ export function GeneratePanel() {
           ? data
           : [];
       setResults(contents);
+      // Update user store with incremented generation count
+      if (user) {
+        setUser({
+          ...user,
+          monthlyGenerationsUsed: (user.monthlyGenerationsUsed ?? 0) + 1,
+        });
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Failed to generate content';

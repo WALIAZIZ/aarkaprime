@@ -8,14 +8,6 @@ import { useAppStore } from "@/store/app-store";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
-interface ContentCount {
-  count: number;
-}
-
-interface LeadCount {
-  count: number;
-}
-
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -59,13 +51,15 @@ export function StatsGrid() {
         ]);
 
         if (contentRes.status === "fulfilled" && contentRes.value.ok) {
-          const data: ContentCount = await contentRes.value.json();
-          setContentCount(typeof data.count === "number" ? data.count : 0);
+          const json = await contentRes.value.json();
+          const list = Array.isArray(json) ? json : json.content ?? [];
+          setContentCount(list.length);
         }
 
         if (leadsRes.status === "fulfilled" && leadsRes.value.ok) {
-          const data: LeadCount = await leadsRes.value.json();
-          setLeadCount(typeof data.count === "number" ? data.count : 0);
+          const json = await leadsRes.value.json();
+          const list = Array.isArray(json) ? json : json.leads ?? [];
+          setLeadCount(list.length);
         }
       } catch {
         // Silently handle — stats show 0 on error

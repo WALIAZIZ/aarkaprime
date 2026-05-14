@@ -22,8 +22,7 @@ import { LoginForm } from "@/components/auth/login-form";
 import { RegisterForm } from "@/components/auth/register-form";
 
 // Dashboard
-import { StatsGrid } from "@/components/dashboard/stats-grid";
-import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { EnhancedDashboard } from "@/components/dashboard/enhanced-dashboard";
 
 // Properties
 import { PropertyList } from "@/components/properties/property-list";
@@ -78,18 +77,7 @@ function PricingPage() {
 }
 
 function DashboardPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back! Here&apos;s your marketing overview.
-        </p>
-      </div>
-      <StatsGrid />
-      <RecentActivity />
-    </div>
-  );
+  return <EnhancedDashboard />;
 }
 
 function PropertiesPage() {
@@ -130,7 +118,8 @@ export default function Home() {
         try {
           const res = await fetch(`/api/user?userId=${parsed.id}`);
           if (res.ok) {
-            const data = await res.json();
+            const json = await res.json();
+            const data = json.user ?? json;
             setUser({
               ...parsed,
               monthlyGenerationsUsed: data.monthlyGenerationsUsed,

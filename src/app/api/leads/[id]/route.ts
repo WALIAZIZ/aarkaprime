@@ -22,7 +22,7 @@ export async function PUT(
       );
     }
 
-    const validStatuses = ["new", "contacted", "qualified", "negotiation", "won", "lost"];
+    const validStatuses = ["new", "contacted", "viewing", "negotiation", "closed", "lost"];
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` },

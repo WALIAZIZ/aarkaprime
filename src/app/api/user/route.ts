@@ -55,7 +55,7 @@ interface UpdateUserBody {
 export async function PUT(req: NextRequest) {
   try {
     const body: UpdateUserBody = await req.json();
-    const { userId, name, company } = body;
+    const { userId, name, email, company } = body;
 
     if (!userId) {
       return NextResponse.json(
@@ -64,8 +64,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updateData: { name?: string; company?: string } = {};
+    const updateData: { name?: string; email?: string; company?: string } = {};
     if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
     if (company !== undefined) updateData.company = company;
 
     const updatedUser = await updateUser(userId, updateData);

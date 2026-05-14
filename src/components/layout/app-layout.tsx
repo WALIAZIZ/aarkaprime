@@ -165,6 +165,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       // ignore errors
     }
     setUser(null);
+    localStorage.removeItem('estateiq_user');
     setView('landing');
   };
 

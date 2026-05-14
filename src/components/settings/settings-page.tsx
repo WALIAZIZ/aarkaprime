@@ -97,7 +97,8 @@ export function SettingsPage() {
     try {
       const res = await fetch(`/api/user?userId=${userId}`);
       if (res.ok) {
-        const data = await res.json();
+        const json = await res.json();
+        const data = json.user ?? json;
         const u: UserData = {
           id: data.id || userId,
           email: data.email || user?.email || '',
@@ -193,6 +194,7 @@ export function SettingsPage() {
       }
 
       setUser(null);
+      localStorage.removeItem('estateiq_user');
       setView('landing');
     } catch {
       addToast({

@@ -21,7 +21,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 
 export async function updateUser(
   id: string,
-  data: Partial<Pick<User, "name" | "company" | "plan">>
+  data: Partial<Pick<User, "name" | "email" | "company" | "plan">>
 ): Promise<User> {
   return db.user.update({ where: { id }, data });
 }

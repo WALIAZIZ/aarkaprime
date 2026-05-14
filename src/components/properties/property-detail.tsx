@@ -217,7 +217,8 @@ export function PropertyDetail() {
         `/api/properties/${selectedPropertyId}?userId=${user.id}`
       );
       if (!res.ok) throw new Error('Failed to fetch property');
-      const data: PropertyData = await res.json();
+      const json = await res.json();
+      const data: PropertyData = json.property ?? json;
       setProperty(data);
     } catch (err) {
       setError(
@@ -237,7 +238,8 @@ export function PropertyDetail() {
         `/api/content?userId=${user.id}&propertyId=${selectedPropertyId}`
       );
       if (!res.ok) throw new Error('Failed to fetch content');
-      const data: GeneratedContentItem[] = await res.json();
+      const json = await res.json();
+      const data: GeneratedContentItem[] = Array.isArray(json) ? json : json.content ?? [];
       setGeneratedContent(data);
     } catch {
       setGeneratedContent([]);
@@ -255,7 +257,8 @@ export function PropertyDetail() {
         `/api/leads?userId=${user.id}&propertyId=${selectedPropertyId}`
       );
       if (!res.ok) throw new Error('Failed to fetch leads');
-      const data: LeadItem[] = await res.json();
+      const json = await res.json();
+      const data: LeadItem[] = Array.isArray(json) ? json : json.leads ?? [];
       setLeads(data);
     } catch {
       setLeads([]);
