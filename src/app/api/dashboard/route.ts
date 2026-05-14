@@ -28,6 +28,13 @@ export async function GET(req: NextRequest) {
       priceAggregation,
       closedLeadsCount,
       propertiesWithCounts,
+      recentContent,
+      recentLeads,
+      userRecord,
+      contentByLanguageRaw,
+      leadsByMonthRaw,
+      propertiesByStatusRaw,
+      topPropertiesByContent,
     ] = await Promise.all([
       // Total properties
       db.property.count({ where: { userId } }),
@@ -100,6 +107,8 @@ export async function GET(req: NextRequest) {
         where: { userId },
         _sum: { price: true },
         _avg: { price: true },
+        _min: { price: true },
+        _max: { price: true },
       }),
 
       // Closed leads count
@@ -121,6 +130,66 @@ export async function GET(req: NextRequest) {
         },
         take: 10,
       }),
+
+      // Recent content (last 10)
+      db.generatedContent.findMany({
+        where: { userId },
+        include: { property: { select: { title: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+
+      // Recent leads (last 10)
+      db.lead.findMany({
+        where: { userId },
+        include: { property: { select: { title: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+
+      // User record
+      db.user.findUnique({ where: { id: userId } }),
+
+      // Content by language
+      db.generatedContent.groupBy({
+        by: ["language"],
+        where: { userId },
+        _count: { language: true },
+      }),
+
+      // Leads by month (last 6 months)
+      db.lead.findMany({
+        where: {
+          userId,
+          createdAt: {
+            gte: new Date(new Date().setMonth(new Date().getMonth() - 6)),
+          },
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+
+      // Properties by status
+      db.property.groupBy({
+        by: ["status"],
+        where: { userId },
+        _count: { status: true },
+      }),
+
+      // Top properties by content generated
+      db.property.findMany({
+        where: { userId },
+        include: {
+          _count: {
+            select: { generatedContent: true },
+          },
+        },
+        orderBy: {
+          generatedContent: { _count: "desc" },
+        },
+        take: 5,
+      }),
     ]);
 
     // Build contentByType map
@@ -136,7 +205,6 @@ export async function GET(req: NextRequest) {
       if (key in contentByType) {
         contentByType[key] = item._count.contentType;
       } else {
-        // Map legacy/alternate keys
         if (key.includes("description")) contentByType.description += item._count.contentType;
         else if (key.includes("social")) contentByType.social_post += item._count.contentType;
         else if (key.includes("whatsapp")) contentByType.whatsapp_msg += item._count.contentType;
@@ -174,13 +242,12 @@ export async function GET(req: NextRequest) {
       if (key in leadsBySource) {
         leadsBySource[key] += item._count.source;
       } else {
-        // Map alternate keys
         if (key.includes("social")) leadsBySource["social-media"] += item._count.source;
         else if (key.includes("referral")) leadsBySource.referral += item._count.source;
       }
     }
 
-    // Build contentByDay array (last 14 days for display)
+    // Build day counts helper
     function buildDayCounts(
       records: { createdAt: Date }[],
       days: number
@@ -203,8 +270,41 @@ export async function GET(req: NextRequest) {
         .sort((a, b) => a.date.localeCompare(b.date));
     }
 
+    // Build month counts helper
+    function buildMonthCounts(
+      records: { createdAt: Date }[],
+      months: number
+    ): { month: string; count: number }[] {
+      const monthMap = new Map<string, number>();
+      const monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      ];
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+        monthMap.set(key, 0);
+      }
+      for (const record of records) {
+        const d = record.createdAt;
+        const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+        if (monthMap.has(key)) {
+          monthMap.set(key, (monthMap.get(key) ?? 0) + 1);
+        }
+      }
+      return Array.from(monthMap.entries())
+        .map(([month, count]) => ({ month, count }))
+        .sort((a, b) => {
+          // Sort by the month order in the map (preserves chronological)
+          const keys = Array.from(monthMap.keys());
+          return keys.indexOf(a.month) - keys.indexOf(b.month);
+        });
+    }
+
     const contentByDay = buildDayCounts(contentByDayRaw, 14);
     const leadsByDay = buildDayCounts(leadsByDayRaw, 30);
+    const leadsByMonth = buildMonthCounts(leadsByMonthRaw, 6);
 
     // Build propertyTypes map
     const propertyTypes: Record<string, number> = {};
@@ -212,9 +312,39 @@ export async function GET(req: NextRequest) {
       propertyTypes[item.propertyType] = item._count.propertyType;
     }
 
+    // Build properties by status
+    const propertiesByStatus: Record<string, number> = {
+      active: 0,
+      pending: 0,
+      sold: 0,
+      inactive: 0,
+    };
+    for (const item of propertiesByStatusRaw) {
+      const key = item.status.toLowerCase();
+      if (key in propertiesByStatus) {
+        propertiesByStatus[key] = item._count.status;
+      }
+    }
+
+    // Build content by language
+    const contentByLanguage: Record<string, number> = {
+      english: 0,
+      swahili: 0,
+    };
+    for (const item of contentByLanguageRaw) {
+      const key = item.language.toLowerCase();
+      if (key === "swahili" || key === "sw") {
+        contentByLanguage.swahili += item._count.language;
+      } else {
+        contentByLanguage.english += item._count.language;
+      }
+    }
+
     // Price data
     const totalPropertyPrice = priceAggregation._sum.price ?? 0;
     const avgPropertyPrice = priceAggregation._avg.price ?? 0;
+    const minPropertyPrice = priceAggregation._min.price ?? 0;
+    const maxPropertyPrice = priceAggregation._max.price ?? 0;
 
     // Conversion rate
     const conversionRate =
@@ -233,6 +363,17 @@ export async function GET(req: NextRequest) {
       leadCount: p._count.leads,
     }));
 
+    // Top content generators
+    const topContentProperties = topPropertiesByContent.map((p) => ({
+      id: p.id,
+      title: p.title,
+      contentCount: p._count.generatedContent,
+    }));
+
+    // User quota info
+    const quotaUsed = userRecord?.monthlyGenerationsUsed ?? 0;
+    const quotaLimit = userRecord?.monthlyGenerationsLimit ?? 10;
+
     return NextResponse.json({
       overview: {
         totalProperties,
@@ -244,12 +385,38 @@ export async function GET(req: NextRequest) {
         leadsBySource,
         contentByDay,
         leadsByDay,
+        leadsByMonth,
         propertyTypes,
         totalPropertyPrice,
         avgPropertyPrice,
+        minPropertyPrice,
+        maxPropertyPrice,
         conversionRate,
+        propertiesByStatus,
+        contentByLanguage,
+        quotaUsed,
+        quotaLimit,
       },
       propertyPerformance,
+      topContentProperties,
+      recentContent: recentContent.map((c) => ({
+        id: c.id,
+        title: c.title,
+        contentType: c.contentType,
+        language: c.language,
+        createdAt: c.createdAt,
+        propertyName: c.property?.title ?? null,
+      })),
+      recentLeads: recentLeads.map((l) => ({
+        id: l.id,
+        name: l.name,
+        email: l.email,
+        phone: l.phone,
+        status: l.status,
+        source: l.source,
+        createdAt: l.createdAt,
+        propertyName: l.property?.title ?? null,
+      })),
     });
   } catch (error) {
     console.error("Dashboard API error:", error);
