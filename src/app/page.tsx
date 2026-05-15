@@ -143,7 +143,17 @@ export default function Home() {
     }
   }, [setUser, setLoading]);
 
+  // Initialize database on app mount
   useEffect(() => {
+    fetch("/api/setup").then((res) => {
+      if (res.ok) {
+        console.log("[App] Database ready");
+      } else {
+        console.warn("[App] Database setup in progress...");
+      }
+    }).catch(() => {
+      // Ignore — will retry on next API call
+    });
     checkSession();
   }, [checkSession]);
 

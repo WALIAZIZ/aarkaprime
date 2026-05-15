@@ -72,9 +72,11 @@ export function LoginForm() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
-        throw new Error(
-          errorData?.message || "Invalid email or password. Please try again."
-        );
+        const msg = errorData?.error || errorData?.message || "";
+        if (msg.includes("Internal server error") || msg.includes("database") || msg.includes("Database")) {
+          throw new Error("Database is being set up. Please wait a moment and try again.");
+        }
+        throw new Error(msg || "Invalid email or password. Please try again.");
       }
 
       const response: SignInResponse = await res.json();
