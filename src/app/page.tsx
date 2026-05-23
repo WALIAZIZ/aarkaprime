@@ -143,17 +143,22 @@ export default function Home() {
     }
   }, [setUser, setLoading]);
 
-  // Initialize database on app mount
+  // Initialize database and seed demo data on app mount
   useEffect(() => {
-    fetch("/api/setup").then((res) => {
-      if (res.ok) {
-        console.log("[App] Database ready");
+    // Step 1: Create tables
+    fetch("/api/setup").then((setupRes) => {
+      if (setupRes.ok) {
+        console.log("[App] Database tables ready");
+        // Step 2: Seed demo data (creates demo user + sample properties)
+        fetch("/api/seed", { method: "POST" }).then((seedRes) => {
+          if (seedRes.ok) {
+            console.log("[App] Demo data seeded");
+          }
+        }).catch(() => {});
       } else {
         console.warn("[App] Database setup in progress...");
       }
-    }).catch(() => {
-      // Ignore — will retry on next API call
-    });
+    }).catch(() => {});
     checkSession();
   }, [checkSession]);
 
