@@ -1,15 +1,26 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
 
 export async function GET() {
   try {
-    // Try a simple query to check database connection
-    await db.$queryRaw`SELECT 1`;
-    return NextResponse.json({ status: "ready", database: "connected" });
+    const prisma = new PrismaClient();
+    
+    // Check if tables exist by trying a query
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      await prisma.$disconnect();
+      return NextResponse.json({ status: "ready", database: "connected" });
+    } catch (error) {
+      await prisma.$disconnect();
+      return NextResponse.json(
+        { status: "error", error: "Database not connected. Please check DATABASE_URL environment variable in Vercel." },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error("[Setup] Database connection error:", error);
+    console.error("[Setup] Database error:", error);
     return NextResponse.json(
-      { status: "error", error: "Database connection failed. Please check DATABASE_URL." },
+      { status: "error", error: String(error) },
       { status: 500 }
     );
   }
