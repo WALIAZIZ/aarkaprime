@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { initializeDb } from "@/lib/db";
+import { db } from "@/lib/db";
 
 export async function GET() {
   try {
-    await initializeDb();
+    // Try a simple query to check database connection
+    await db.$queryRaw`SELECT 1`;
     return NextResponse.json({ status: "ready", database: "connected" });
   } catch (error) {
-    console.error("[Setup] Database initialization error:", error);
+    console.error("[Setup] Database connection error:", error);
     return NextResponse.json(
-      { status: "error", error: "Database setup failed. Please try again in a moment." },
+      { status: "error", error: "Database connection failed. Please check DATABASE_URL." },
       { status: 500 }
     );
   }

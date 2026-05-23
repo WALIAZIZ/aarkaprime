@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Increase serverless function timeout for DB operations
+  serverExternalPackages: ["@prisma/client", "prisma"],
 };
 
 export default nextConfig;
