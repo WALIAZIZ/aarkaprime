@@ -6,14 +6,13 @@ export async function GET() {
     const prisma = new PrismaClient();
     
     try {
-      // Create all tables using raw SQL if they don't exist
+      // Create tables if they don't exist
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "User" (
           "id" TEXT NOT NULL PRIMARY KEY,
           "email" TEXT NOT NULL,
           "name" TEXT,
           "company" TEXT,
-          "country" TEXT NOT NULL DEFAULT 'kenya',
           "password" TEXT NOT NULL,
           "role" TEXT NOT NULL DEFAULT 'user',
           "plan" TEXT NOT NULL DEFAULT 'free',
@@ -25,6 +24,20 @@ export async function GET() {
           "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      // Add country column if it doesn't exist (migration for existing tables)
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "country" TEXT NOT NULL DEFAULT 'kenya';`);
+      } catch {
+        // Column already exists — that's fine
+      }
+
+      // Make email unique if not already (for fresh tables)
+      try {
+        await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");`);
+      } catch {
+        // Index already exists
+      }
 
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "Property" (
