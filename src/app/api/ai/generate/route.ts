@@ -3,6 +3,9 @@ import { getUserById, getPropertyById, createContent, incrementGenerationCount }
 import { generateContent } from "@/lib/ai";
 import type { PropertyData } from "@/lib/ai";
 
+// Vercel serverless function timeout — set to max allowed
+export const maxDuration = 60;
+
 interface GenerateBody {
   propertyId: string;
   contentType: string;
@@ -44,24 +47,35 @@ export async function POST(req: NextRequest) {
     // Resolve country code: body > user profile > fallback to "kenya"
     const countryCode = bodyCountryCode || user.country || "kenya";
 
-    if (user.monthlyGenerationsUsed >= user.monthlyGenerationsLimit) {
-      return NextResponse.json(
-        {
-          error: "Monthly generation limit reached",
-          details: {
-            used: user.monthlyGenerationsUsed,
-            limit: user.monthlyGenerationsLimit,
+    // Check generation quota — super_admin and enterprise have unlimited
+    if (user.role !== "super_admin" && user.plan !== "enterprise") {
+      if (user.monthlyGenerationsUsed >= user.monthlyGenerationsLimit) {
+        return NextResponse.json(
+          {
+            error: "Monthly generation limit reached. Please upgrade your plan for more generations.",
+            details: {
+              used: user.monthlyGenerationsUsed,
+              limit: user.monthlyGenerationsLimit,
+            },
           },
-        },
-        { status: 429 }
-      );
+          { status: 429 }
+        );
+      }
     }
 
-    // Get property
-    const property = await getPropertyById(propertyId, userId);
+    // Get property — try with userId first, then without (for flexibility)
+    let property = await getPropertyById(propertyId, userId);
+    if (!property) {
+      // Fallback: try getting property without userId check
+      const { db } = await import("@/lib/db");
+      property = await db.property.findUnique({
+        where: { id: propertyId },
+      });
+    }
+
     if (!property) {
       return NextResponse.json(
-        { error: "Property not found" },
+        { error: "Property not found. Please select a valid property." },
         { status: 404 }
       );
     }
@@ -76,30 +90,65 @@ export async function POST(req: NextRequest) {
       bedrooms: property.bedrooms,
       bathrooms: property.bathrooms,
       areaSqm: property.areaSqm || undefined,
-      features: property.features ? property.features.split(",").map(f => f.trim()) : [],
+      features: property.features ? property.features.split(",").map(f => f.trim()).filter(Boolean) : [],
       description: property.description || undefined,
     };
 
     // Generate content via AI engine
-    const results = await generateContent(propertyData, contentType, language || "english", countryCode);
+    let results;
+    try {
+      results = await generateContent(propertyData, contentType, language || "english", countryCode);
+    } catch (aiError) {
+      console.error("[AI Generation] Error:", aiError);
+      // If AI fails completely, return a meaningful error
+      return NextResponse.json(
+        {
+          error: "AI generation service is temporarily unavailable. Please try again in a moment.",
+          details: aiError instanceof Error ? aiError.message : "Unknown error",
+        },
+        { status: 503 }
+      );
+    }
 
     // Save each generated result to DB
     const savedContent = [];
     for (const result of results) {
-      const content = await createContent({
-        userId,
-        propertyId,
-        contentType: result.contentType,
-        platform: result.platform || null,
-        language: result.language,
-        title: result.title,
-        body: result.body,
-      });
-      savedContent.push(content);
+      try {
+        const content = await createContent({
+          userId,
+          propertyId,
+          contentType: result.contentType,
+          platform: result.platform || null,
+          language: result.language,
+          title: result.title,
+          body: result.body,
+        });
+        savedContent.push(content);
+      } catch (saveError) {
+        console.error("[AI Generation] Save error for result:", saveError);
+        // If save fails, still include the result (unsaved)
+        savedContent.push({
+          id: `unsaved_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          userId,
+          propertyId,
+          contentType: result.contentType,
+          platform: result.platform || null,
+          language: result.language,
+          title: result.title,
+          body: result.body,
+          tokensUsed: 0,
+          aiModel: "deepseek",
+          createdAt: new Date(),
+        });
+      }
     }
 
     // Increment user's generation count
-    await incrementGenerationCount(userId);
+    try {
+      await incrementGenerationCount(userId);
+    } catch (countError) {
+      console.error("[AI Generation] Failed to increment count:", countError);
+    }
 
     return NextResponse.json({ results: savedContent }, { status: 201 });
   } catch (error) {

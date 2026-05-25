@@ -20,6 +20,7 @@ import { Footer } from "@/components/landing/footer";
 // Auth
 import { LoginForm } from "@/components/auth/login-form";
 import { RegisterForm } from "@/components/auth/register-form";
+import { AdminLoginForm } from "@/components/auth/admin-login-form";
 
 // Dashboard
 import { EnhancedDashboard } from "@/components/dashboard/enhanced-dashboard";
@@ -177,6 +178,7 @@ export default function Home() {
     view !== "landing" &&
     view !== "login" &&
     view !== "register" &&
+    view !== "admin-login" &&
     view !== "pricing";
 
   useEffect(() => {
@@ -194,6 +196,8 @@ export default function Home() {
           return <LoginForm />;
         case "register":
           return <RegisterForm />;
+        case "admin-login":
+          return <AdminLoginForm />;
         case "pricing":
           return <PricingPage />;
         case "landing":

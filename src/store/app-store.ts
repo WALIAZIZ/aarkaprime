@@ -4,6 +4,7 @@ export type AppView =
   | "landing"
   | "login"
   | "register"
+  | "admin-login"
   | "dashboard"
   | "properties"
   | "add-property"

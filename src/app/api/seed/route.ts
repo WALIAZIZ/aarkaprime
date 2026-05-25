@@ -17,7 +17,7 @@ export async function POST() {
         return NextResponse.json({ status: "exists", message: "Demo data already seeded" });
       }
 
-      // Create demo user
+      // Create demo user (regular admin for demo purposes)
       const hashedPassword = await hash("demo1234", 12);
       const demoUser = await prisma.user.create({
         data: {
@@ -34,6 +34,30 @@ export async function POST() {
           maxListings: 50,
         },
       });
+
+      // Create Super Admin user (separate from demo)
+      const existingAdmin = await prisma.user.findUnique({
+        where: { email: "admin@aarkaprime.com" },
+      });
+
+      if (!existingAdmin) {
+        const superAdminPassword = await hash("Aarka@Admin2024", 12);
+        await prisma.user.create({
+          data: {
+            email: "admin@aarkaprime.com",
+            name: "Super Admin",
+            company: "Aarka Prime",
+            country: "kenya",
+            password: superAdminPassword,
+            role: "super_admin",
+            plan: "enterprise",
+            monthlyGenerationsUsed: 0,
+            monthlyGenerationsLimit: 999999,
+            activeListings: 0,
+            maxListings: 999999,
+          },
+        });
+      }
 
       // Create demo properties
       await prisma.property.createMany({
@@ -178,9 +202,13 @@ export async function POST() {
       return NextResponse.json({
         status: "success",
         message: "Demo data seeded successfully",
-        user: {
+        demo: {
           email: "demo@estateiq.com",
           password: "demo1234",
+        },
+        superAdmin: {
+          email: "admin@aarkaprime.com",
+          password: "Aarka@Admin2024",
         },
       });
     } catch (error) {

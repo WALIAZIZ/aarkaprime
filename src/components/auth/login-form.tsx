@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock, Shield } from "lucide-react";
 
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
@@ -169,7 +169,7 @@ export function LoginForm() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="justify-center">
+        <CardFooter className="flex-col gap-3">
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <button
@@ -180,6 +180,14 @@ export function LoginForm() {
               Register
             </button>
           </p>
+          <button
+            type="button"
+            onClick={() => setView("admin-login")}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-amber-600 transition-colors"
+          >
+            <Shield className="size-3" />
+            Admin Portal
+          </button>
         </CardFooter>
       </Card>
     </div>

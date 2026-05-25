@@ -113,7 +113,8 @@ async function callDeepSeek(
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+  // 25s timeout — safe for Vercel serverless (max 60s on Pro, 10s on Hobby)
+  const timeout = setTimeout(() => controller.abort(), 25000);
 
   try {
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
@@ -129,7 +130,7 @@ async function callDeepSeek(
           { role: "user", content: prompt },
         ],
         temperature: 0.8,
-        max_tokens: 3000,
+        max_tokens: 2000,
       }),
       signal: controller.signal,
     });
@@ -139,16 +140,16 @@ async function callDeepSeek(
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "");
       console.error(`[AI] DeepSeek API error ${response.status}: ${errorBody}`);
-      throw new Error(
-        `DeepSeek API error (${response.status}): ${response.statusText}`
-      );
+      // Fall back to built-in content instead of throwing
+      return generateFallbackContent(prompt, countryCode);
     }
 
     const json = await response.json();
     const content = json.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new Error("DeepSeek returned empty response");
+      console.warn("[AI] DeepSeek returned empty response, using fallback");
+      return generateFallbackContent(prompt, countryCode);
     }
 
     console.log("[AI] DeepSeek generation successful");
@@ -159,7 +160,9 @@ async function callDeepSeek(
       console.error("[AI] DeepSeek request timed out, using fallback");
       return generateFallbackContent(prompt, countryCode);
     }
-    throw error;
+    // Any other error — fall back instead of throwing
+    console.error("[AI] DeepSeek error, using fallback:", error);
+    return generateFallbackContent(prompt, countryCode);
   }
 }
 

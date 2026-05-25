@@ -60,13 +60,21 @@ const viewTitles: Record<string, string> = {
 const planColors: Record<string, string> = {
   free: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   starter: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  pro: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   professional: 'bg-emerald-600 text-white dark:bg-emerald-600',
   enterprise: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
 };
 
 const countryFlags: Record<string, string> = {
-  kenya: '🇰🇪',
-  ethiopia: '🇪🇹',
+  kenya: '\u{1F1F0}\u{1F1EA}',
+  ethiopia: '\u{1F1EA}\u{1F1F9}',
+  tanzania: '\u{1F1F9}\u{1F1FF}',
+  uganda: '\u{1F1FA}\u{1F1EC}',
+  rwanda: '\u{1F1F7}\u{1F1FC}',
+  burundi: '\u{1F1E7}\u{1F1EE}',
+  somalia: '\u{1F1F8}\u{1F1F4}',
+  southsudan: '\u{1F1F8}\u{1F1F8}',
+  drc: '\u{1F1E8}\u{1F1E9}',
 };
 
 function SidebarNavContent({
@@ -77,7 +85,7 @@ function SidebarNavContent({
   const { view, setView, user } = useAppStore();
 
   const visibleNavItems = navItems.filter(
-    (item) => !item.adminOnly || user?.role === 'admin'
+    (item) => !item.adminOnly || user?.role === 'super_admin'
   );
 
   return (
