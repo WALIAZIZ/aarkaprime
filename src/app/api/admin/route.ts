@@ -42,11 +42,11 @@ export async function GET() {
       }),
     ]);
 
-    // Users by country
-    const usersByCountry = { kenya: 0, ethiopia: 0 };
+    // Users by country — dynamic, counts any country code present
+    const usersByCountry: Record<string, number> = {};
     users.forEach((u) => {
-      if (u.country === "ethiopia") usersByCountry.ethiopia++;
-      else usersByCountry.kenya++;
+      const code = u.country || "unknown";
+      usersByCountry[code] = (usersByCountry[code] || 0) + 1;
     });
 
     // Users by plan

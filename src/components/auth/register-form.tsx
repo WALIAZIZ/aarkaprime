@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Loader2, Mail, Lock, User, Building2, Globe } from "lucide-react";
 
 import { useAppStore } from "@/store/app-store";
+import { COUNTRIES_SORTED } from "@/lib/countries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +32,7 @@ const registerSchema = z
     name: z.string().min(1, "Name is required"),
     email: z.string().email("Please enter a valid email address"),
     company: z.string().optional(),
-    country: z.enum(["kenya", "ethiopia"], {
+    country: z.enum(COUNTRIES_SORTED.map((c) => c.code) as [string, ...string[]], {
       required_error: "Please select a country",
     }),
     password: z.string().min(8, "Password must be at least 8 characters"),
@@ -207,16 +208,13 @@ export function RegisterForm() {
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="kenya">
-                        <span className="flex items-center gap-2">
-                          🇰🇪 Kenya
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="ethiopia">
-                        <span className="flex items-center gap-2">
-                          🇪🇹 Ethiopia
-                        </span>
-                      </SelectItem>
+                      {COUNTRIES_SORTED.map((country) => (
+                        <SelectItem key={country.code} value={country.code}>
+                          <span className="flex items-center gap-2">
+                            {country.flag} {country.name}
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}

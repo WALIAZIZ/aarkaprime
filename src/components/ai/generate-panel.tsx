@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
+import { getCountryLanguages, getCountryConfig } from '@/lib/countries';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -102,9 +103,11 @@ const contentTypes = [
   },
 ];
 
-const languages = [
-  { value: 'english', label: 'English', flag: '🇺🇸' },
-  { value: 'swahili', label: 'Swahili', flag: '🇰🇪' },
+// Dynamic languages derived from user's country (computed inside component)
+// Default fallback languages when no country is set
+const DEFAULT_LANGUAGES = [
+  { value: 'english', label: 'English', flag: '\u{1F1EC}\u{1F1E7}' },
+  { value: 'swahili', label: 'Swahili', flag: '\u{1F1F0}\u{1F1EA}' },
 ];
 
 export function GeneratePanel() {
@@ -123,6 +126,13 @@ export function GeneratePanel() {
   );
   const [contentType, setContentType] = useState<string>('');
   const [language, setLanguage] = useState<string>('english');
+
+  // Derive languages and currency from user's country
+  const userCountryCode = user?.country || 'kenya';
+  const countryConfig = getCountryConfig(userCountryCode);
+  const availableLanguages = countryConfig
+    ? countryConfig.languages.map((l) => ({ value: l.code, label: l.name, flag: l.flag }))
+    : DEFAULT_LANGUAGES;
   const [results, setResults] = useState<GeneratedContent[]>([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
   const [aiStatus, setAiStatus] = useState<AIStatusResponse | null>(null);
@@ -200,6 +210,7 @@ export function GeneratePanel() {
           contentType,
           language,
           userId,
+          countryCode: userCountryCode,
         }),
       });
 
@@ -341,6 +352,11 @@ export function GeneratePanel() {
                           <span className="truncate max-w-[200px]">
                             {p.title}
                           </span>
+                          {countryConfig && (
+                            <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                              {countryConfig.currencySymbol} {(p.price / 1000000).toFixed(1)}M
+                            </span>
+                          )}
                         </div>
                       </SelectItem>
                     ))
@@ -386,7 +402,7 @@ export function GeneratePanel() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {languages.map((lang) => (
+                  {availableLanguages.map((lang) => (
                     <SelectItem key={lang.value} value={lang.value}>
                       <div className="flex items-center gap-2">
                         <span>{lang.flag}</span>

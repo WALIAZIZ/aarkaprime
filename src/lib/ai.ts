@@ -1,3 +1,9 @@
+import {
+  getCountryConfig,
+  formatPrice,
+  getCountryHashtags,
+} from "@/lib/countries";
+
 export interface PropertyData {
   title: string;
   propertyType: string;
@@ -25,7 +31,19 @@ export interface AIUsage {
   tokensUsed?: number;
 }
 
-const SYSTEM_PROMPT = `You are an elite real estate marketing copywriter specializing in the Kenyan property market. You understand Nairobi neighborhoods, Kenyan buyer psychology, and what makes properties sell in East Africa. Always use metric system (sqm), KES currency, and reference Nairobi landmarks/neighborhoods when applicable. Be professional yet persuasive.
+/**
+ * Build a system prompt tailored to the given country's real estate market.
+ */
+function getSystemPrompt(countryCode: string): string {
+  const country = getCountryConfig(countryCode);
+  const hashtags = getCountryHashtags(countryCode).join(" ");
+
+  if (country) {
+    const cityList = country.cities.map((c) => c.name).join(", ");
+    const langList = country.languages.map((l) => l.name).join(", ");
+    const countryNote = `You specialize in the ${country.name} property market. Use ${country.currency} (${country.currencyCode}) for all prices. Reference ${cityList} neighborhoods and landmarks when applicable. Use metric system (sqm). Key languages spoken: ${langList}.`;
+
+    return `You are an elite real estate marketing copywriter specializing in the East African property market. ${countryNote} Be professional yet persuasive.
 
 CRITICAL FORMATTING RULES:
 - Always separate multiple outputs with the exact delimiter specified (e.g., "===VERSION===", "===POST===", etc.)
@@ -36,14 +54,44 @@ CRITICAL FORMATTING RULES:
 - For ad copy: output 3 ads separated by "===AD==="
 - Each output must start with the label (VERSION, POST, TONE, TYPE, VARIATION) followed by a colon and the category name
 - Do NOT add extra headers or markdown formatting outside the specified format
-- Include relevant Kenyan real estate hashtags for social posts: #NairobiProperties #KenyaRealEstate #BuyKenya #PropertyKenya #NairobiHomes #InvestInKenya #RealEstateKE #NairobiRealEstate`;
+- Include relevant ${country.name} real estate hashtags for social posts: ${hashtags}`;
+  }
 
-function buildPropertyContext(data: PropertyData): string {
+  // Fallback when no country is matched
+  return `You are an elite real estate marketing copywriter specializing in the East African property market. Use metric system (sqm). Be professional yet persuasive.
+
+CRITICAL FORMATTING RULES:
+- Always separate multiple outputs with the exact delimiter specified (e.g., "===VERSION===", "===POST===", etc.)
+- For property descriptions: output 3 versions separated by "===VERSION==="
+- For social posts: output 5 posts separated by "===POST==="
+- For WhatsApp: output 3 messages separated by "===MSG==="
+- For emails: output 3 emails separated by "===EMAIL==="
+- For ad copy: output 3 ads separated by "===AD==="
+- Each output must start with the label (VERSION, POST, TONE, TYPE, VARIATION) followed by a colon and the category name
+- Do NOT add extra headers or markdown formatting outside the specified format
+- Include relevant East African real estate hashtags for social posts: #RealEstate #PropertyForSale #EastAfrica #InvestInRealEstate`;
+}
+
+/**
+ * Build country context string for AI prompts
+ */
+export function buildCountryContext(countryCode: string): string {
+  const country = getCountryConfig(countryCode);
+  if (!country) return "East African region.";
+  const cityList = country.cities
+    .map((c) => `${c.name} (${c.neighborhoods.slice(0, 5).join(", ")})`)
+    .join("; ");
+  const langList = country.languages.map((l) => l.name).join(", ");
+  return `${country.name} — Currency: ${country.currency} (${country.currencyCode}, ${country.currencySymbol}). Major cities: ${cityList}. Languages: ${langList}. Market trends: Properties in ${country.cities[0]?.name || country.name} show strong demand with steady appreciation. Use metric system.`;
+}
+
+function buildPropertyContext(data: PropertyData, countryCode: string): string {
+  const priceFormatted = formatPrice(countryCode, data.price);
   return `
 Property: ${data.title}
 Type: ${data.propertyType}
 Location: ${data.location}${data.neighborhood ? `, ${data.neighborhood}` : ""}
-Price: KES ${data.price.toLocaleString()}
+Price: ${priceFormatted}
 Bedrooms: ${data.bedrooms}
 Bathrooms: ${data.bathrooms}
 ${data.areaSqm ? `Area: ${data.areaSqm} sqm` : ""}
@@ -54,13 +102,14 @@ ${data.description ? `Original Description: ${data.description}` : ""}
 
 async function callDeepSeek(
   prompt: string,
-  systemPrompt: string = SYSTEM_PROMPT
+  countryCode: string = "kenya"
 ): Promise<string> {
+  const systemPrompt = getSystemPrompt(countryCode);
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
   if (!apiKey || apiKey === "sk-placeholder-key") {
     console.warn("[AI] No DeepSeek API key found, using fallback generator");
-    return generateFallbackContent(prompt);
+    return generateFallbackContent(prompt, countryCode);
   }
 
   const controller = new AbortController();
@@ -108,58 +157,65 @@ async function callDeepSeek(
     clearTimeout(timeout);
     if (error instanceof Error && error.name === "AbortError") {
       console.error("[AI] DeepSeek request timed out, using fallback");
-      return generateFallbackContent(prompt);
+      return generateFallbackContent(prompt, countryCode);
     }
     throw error;
   }
 }
 
-function generateFallbackContent(prompt: string): string {
+function generateFallbackContent(prompt: string, countryCode: string = "kenya"): string {
+  const country = getCountryConfig(countryCode);
+  const countryName = country?.name || "Kenya";
+  const mainCity = country?.cities[0]?.name || "Nairobi";
+  const currencySymbol = country?.currencySymbol || "KSh";
+  const hashtags = getCountryHashtags(countryCode).slice(0, 4).join(" ");
+  const priceStr = country ? `${currencySymbol} [Price]` : "KES [Price]";
+
   if (prompt.includes("property description")) {
     return `VERSION: Short
-${prompt.includes("apartment") ? "Stunning" : "Beautiful"} ${prompt.includes("apartment") ? "apartment" : "property"} in a prime ${prompt.includes("Nairobi") ? "Nairobi" : "Kenyan"} location. Modern finishes, spacious rooms, excellent investment opportunity.
+${prompt.includes("apartment") ? "Stunning" : "Beautiful"} ${prompt.includes("apartment") ? "apartment" : "property"} in a prime ${mainCity} location. Modern finishes, spacious rooms, excellent investment opportunity in ${countryName}.
 
 ===VERSION===
 VERSION: Medium
-Welcome to this exceptional property that embodies the best of Kenyan living. Situated in a prime location, this ${prompt.includes("apartment") ? "apartment" : "home"} offers an unparalleled lifestyle opportunity for discerning buyers and investors alike.
+Welcome to this exceptional property that embodies the best of ${countryName} living. Situated in a prime location, this ${prompt.includes("apartment") ? "apartment" : "home"} offers an unparalleled lifestyle opportunity for discerning buyers and investors alike.
 
 The property features thoughtfully designed spaces that maximize natural light and airflow, creating an atmosphere of warmth and sophistication. Every detail has been carefully considered, from the premium finishes to the intelligent layout that seamlessly blends indoor and outdoor living.
 
-Located in one of Nairobi's most sought-after neighborhoods, you'll enjoy convenient access to shopping centers, international schools, healthcare facilities, and major transport routes. The area has seen consistent property value appreciation, making this not just a home but a sound investment.
+Located in one of ${mainCity}'s most sought-after neighborhoods, you'll enjoy convenient access to shopping centers, international schools, healthcare facilities, and major transport routes. The area has seen consistent property value appreciation, making this not just a home but a sound investment.
 
 Key highlights include spacious living areas, modern kitchen facilities, well-appointed bedrooms with en-suite bathrooms, and dedicated parking. The property also benefits from 24-hour security, reliable water supply, and backup power.
 
 ===VERSION===
 VERSION: Long
-Welcome to this stunning property that represents the pinnacle of modern Kenyan real estate. Whether you're a first-time buyer, growing family, or savvy investor, this exceptional ${prompt.includes("apartment") ? "apartment" : "property"} in one of Nairobi's most dynamic neighborhoods offers something truly special.
+Welcome to this stunning property that represents the pinnacle of modern ${countryName} real estate. Whether you're a first-time buyer, growing family, or savvy investor, this exceptional ${prompt.includes("apartment") ? "apartment" : "property"} in one of ${mainCity}'s most dynamic neighborhoods offers something truly special.
 
 ARCHITECTURE & DESIGN
 The property features contemporary architecture with clean lines, expansive windows, and an open-plan layout that creates a seamless flow between living spaces. High ceilings and premium flooring add a touch of elegance throughout, while the thoughtfully designed rooms maximize both comfort and functionality.
 
 LOCATION & ACCESSIBILITY
-Strategically located with easy access to Nairobi's CBD, Westlands, and major highways. The neighborhood is well-established with excellent infrastructure including tarmacked roads, street lighting, and reliable utilities. Within walking distance to shopping malls, restaurants, gyms, and international schools.
+Strategically located with easy access to ${mainCity}'s major areas and highways. The neighborhood is well-established with excellent infrastructure including tarmacked roads, street lighting, and reliable utilities. Within walking distance to shopping malls, restaurants, gyms, and international schools.
 
 INVESTMENT POTENTIAL
-Properties in this area have shown consistent annual appreciation of 8-12%, making this an excellent long-term investment. The strong rental demand means you can also generate attractive returns if you choose to lease the property. Nairobi's growing middle class and expanding economy continue to drive property values upward.
+Properties in ${countryName} have shown consistent annual appreciation, making this an excellent long-term investment. The strong rental demand means you can also generate attractive returns if you choose to lease the property.
 
 AMENITIES & FEATURES
-Spacious bedrooms with built-in wardrobes, modern bathrooms with high-quality fixtures, chef's kitchen with ample storage, dedicated laundry area, private balcony with views, secure parking for 2 vehicles, 24/7 security with CCTV, borehole water supply, and backup generator.
+Spacious bedrooms with built-in wardrobes, modern bathrooms with high-quality fixtures, chef's kitchen with ample storage, dedicated laundry area, private balcony with views, secure parking, 24/7 security with CCTV, and reliable utilities.
 
-Don't miss this opportunity to own in one of Nairobi's premier addresses. Contact us today to schedule a private viewing.`;
+Don't miss this opportunity to own in one of ${mainCity}'s premier addresses. Contact us today to schedule a private viewing.`;
   }
 
   if (prompt.includes("social media") || prompt.includes("Facebook") || prompt.includes("Instagram")) {
     return `POST: Facebook — Engagement
 🏠 STUNNING PROPERTY ALERT! 🏠
 
-Looking for your dream home in Nairobi? This beautiful property ticks ALL the boxes! ✅
+Looking for your dream home in ${mainCity}? This beautiful property ticks ALL the boxes! ✅
 
 ✨ Prime Location in a sought-after neighborhood
 ✨ Spacious Living Areas perfect for family life
 ✨ Modern Finishes throughout
 ✨ Secure Compound with 24/7 security
 ✨ Investment-Ready with strong ROI potential
-✨ Borehole water + backup generator included
+✨ Reliable utilities included
 
 📍 Located near major amenities — schools, hospitals, malls
 💰 Competitive pricing — won't last long!
@@ -167,21 +223,21 @@ Looking for your dream home in Nairobi? This beautiful property ticks ALL the bo
 
 DM us for more details or call to schedule a viewing TODAY!
 
-#NairobiProperties #KenyaRealEstate #BuyKenya #PropertyKenya #NairobiHomes #InvestInKenya #RealEstateKE #NairobiRealEstate #HomeForSale #PropertyInvestment
+${hashtags}
 
 ===POST===
 POST: Facebook — Information
 📊 PROPERTY DETAILS 📊
 
 Type: Premium Residential
-Location: Nairobi (Prime Neighborhood)
+Location: ${mainCity} (Prime Neighborhood)
 Price: Competitive Market Rate
 Status: Available Now
 
 What makes this property special:
 • Modern architecture with quality finishes
 • Proximity to international schools and hospitals
-• Easy access to CBD and major highways
+• Easy access to major highways
 • Growing neighborhood with excellent infrastructure
 • Strong rental yields for investors
 
@@ -189,15 +245,15 @@ Whether you're buying your first home or adding to your portfolio, this property
 
 📩 Send us a message for the full property brief including floor plans and virtual tour link.
 
-#NairobiProperties #KenyaRealEstate #RealEstateKE #BuyKenya #PropertyKenya
+${hashtags}
 
 ===POST===
 POST: Instagram — Lifestyle
 ✨ Living your best life starts with the right home ✨
 
-Imagine waking up to Nairobi's stunning skyline from your private balcony. Morning coffee on the terrace, kids playing in the garden, and everything you need just minutes away.
+Imagine waking up to ${mainCity}'s stunning skyline from your private balcony. Morning coffee on the terrace, kids playing in the garden, and everything you need just minutes away.
 
-This is what modern Kenyan living looks like. 🇰🇪
+This is what modern ${countryName} living looks like. ${country?.flag || ""}
 
 🏠 Premium property in prime location
 🌿 Lush green surroundings
@@ -207,33 +263,33 @@ This is what modern Kenyan living looks like. 🇰🇪
 
 Your dream lifestyle is within reach. DM us to arrange a viewing.
 
-#NairobiLiving #KenyaRealEstate #DreamHome #NairobiProperties #ModernLiving #InvestInKenya #PropertyKenya #NairobiHomes #RealEstateKE
+${hashtags}
 
 ===POST===
 POST: Instagram — Story Selling
 Looking for your next smart investment? 📈
 
-This Nairobi property is priced to sell and located in one of the fastest-appreciating neighborhoods in the city.
+This ${mainCity} property is priced to sell and located in one of the fastest-appreciating neighborhoods in the city.
 
-✅ 8-12% annual appreciation
+✅ Strong annual appreciation
 ✅ High rental demand
 ✅ Modern finishes
 ✅ Ready to move in
 
 Swipe up or DM for details! 📩
 
-#NairobiRealEstate #KenyaRealEstate #InvestInKenya #PropertyInvestment #RealEstateKE #NairobiProperties
+${hashtags}
 
 ===POST===
 POST: Twitter/X
-🏠 Prime Nairobi property — Modern finishes, 3BR, secure compound. Excellent investment with 8-12% annual appreciation. Priced to sell! DM for details. #NairobiProperties #KenyaRealEstate #RealEstateKE`;
+🏠 Prime ${mainCity} property — Modern finishes, 3BR, secure compound. Excellent investment with strong appreciation. Priced to sell! DM for details. ${hashtags}`;
   }
 
   if (prompt.includes("WhatsApp")) {
     return `TONE: Professional
 Good day,
 
-I hope this message finds you well. I'm reaching out to share details about an exceptional property listing that has just become available in Nairobi.
+I hope this message finds you well. I'm reaching out to share details about an exceptional property listing that has just become available in ${mainCity}.
 
 The property offers:
 • Spacious rooms with modern finishes
@@ -253,7 +309,7 @@ Hey! 👋
 
 Just wanted to share this amazing property I came across — it's exactly what you've been looking for! 🏠
 
-✨ Beautiful location in Nairobi
+✨ Beautiful location in ${mainCity}
 ✨ Great price for the area
 ✨ Modern and well-maintained
 ✨ Won't stay on the market long!
@@ -268,7 +324,7 @@ TONE: Urgent
 
 This property just hit the market and it's already getting attention! At this price, it WILL sell fast.
 
-🏠 Prime Nairobi location
+🏠 Prime ${mainCity} location
 💰 Below market value
 ⏰ Viewing slots filling up this week
 🔑 Move-in ready
@@ -280,26 +336,26 @@ Reply NOW to book your viewing slot before it's too late! 🚀`;
 
   if (prompt.includes("email") || prompt.includes("campaign")) {
     return `TYPE: New Listing
-SUBJECT: 🏠 Exclusive New Listing — Your Dream Home Awaits in Nairobi!
+SUBJECT: 🏠 Exclusive New Listing — Your Dream Home Awaits in ${mainCity}!
 
 Dear Valued Client,
 
-We're thrilled to present an exceptional new listing that has just hit the market. This property represents one of the finest opportunities currently available in Nairobi's competitive real estate market.
+We're thrilled to present an exceptional new listing that has just hit the market. This property represents one of the finest opportunities currently available in ${mainCity}'s competitive real estate market.
 
 PROPERTY HIGHLIGHTS:
-• Prime location in a sought-after Nairobi neighborhood
-• Excellent investment potential with projected 8-12% annual returns
+• Prime location in a sought-after ${mainCity} neighborhood
+• Excellent investment potential with strong projected annual returns
 • Modern amenities and premium finishes throughout
-• Spacious living areas designed for Kenyan family life
+• Spacious living areas designed for ${countryName} family life
 • Secure compound with 24/7 CCTV and controlled access
-• Borehole water supply and backup generator
+• Reliable utilities and backup power
 • Dedicated parking for multiple vehicles
 
 THE NEIGHBORHOOD:
-Located in one of Nairobi's fastest-growing areas, you'll enjoy easy access to international schools, world-class healthcare facilities, premium shopping malls, and major transport routes. The area has consistently ranked among the top 5 neighborhoods for property value appreciation.
+Located in one of ${mainCity}'s fastest-growing areas, you'll enjoy easy access to international schools, world-class healthcare facilities, premium shopping malls, and major transport routes.
 
 PRICING & AVAILABILITY:
-This property is competitively priced and available for immediate viewing. Properties in this location typically sell within 2-3 weeks of listing, so we encourage early action.
+This property is competitively priced and available for immediate viewing. Properties in this location typically sell quickly, so we encourage early action.
 
 We'd love to show you around. Simply reply to this email or call us to schedule a private viewing at your convenience.
 
@@ -312,7 +368,7 @@ SUBJECT: 📅 You're Invited — Exclusive Open House This Weekend!
 
 Dear [Client Name],
 
-You're exclusively invited to our upcoming Open House event this coming weekend. This is a rare opportunity to view one of Nairobi's most desirable properties before it goes to the broader market.
+You're exclusively invited to our upcoming Open House event this coming weekend. This is a rare opportunity to view one of ${mainCity}'s most desirable properties before it goes to the broader market.
 
 EVENT DETAILS:
 📅 Date: This Saturday
@@ -327,7 +383,7 @@ WHAT TO EXPECT:
 • Light refreshments provided
 • Special open-house-only pricing available
 
-This property has generated significant interest, and we wanted to give our valued clients the first opportunity to view. Whether you're looking for your next home or a smart investment, this property ticks every box.
+This property has generated significant interest, and we wanted to give our valued clients the first opportunity to view.
 
 RSVP: Simply reply to this email to confirm your attendance. We'll send you the exact address and a map link.
 
@@ -338,18 +394,18 @@ The EstateIQ Team
 
 ===EMAIL===
 TYPE: Price Drop
-SUBJECT: ⚡ PRICE REDUCED — Incredible Value in Prime Nairobi Location!
+SUBJECT: ⚡ PRICE REDUCED — Incredible Value in Prime ${mainCity} Location!
 
 Dear Valued Client,
 
 Great news! One of our premium listings has just undergone a significant price reduction, creating an exceptional buying opportunity.
 
-ORIGINAL PRICE: KES [Original Amount]
-NEW PRICE: KES [Reduced Amount]
-💰 SAVINGS: KES [Difference]
+ORIGINAL PRICE: ${priceStr}
+NEW PRICE: ${priceStr}
+💰 SAVINGS: ${priceStr}
 
 THE PROPERTY:
-Located in one of Nairobi's most established and desirable neighborhoods, this property offers everything a modern homeowner or investor could want.
+Located in one of ${mainCity}'s most established and desirable neighborhoods, this property offers everything a modern homeowner or investor could want.
 
 KEY SELLING POINTS:
 • Spacious rooms with high-quality finishes
@@ -359,7 +415,7 @@ KEY SELLING POINTS:
 • Already seeing strong appreciation in the area
 
 WHY THE PRICE DROP?
-The owner is relocating overseas and has instructed us to sell quickly. This urgency translates directly into savings for you — the buyer.
+The owner is relocating and has instructed us to sell quickly. This urgency translates directly into savings for you — the buyer.
 
 IMPORTANT: Properties in this neighborhood at this price point are extremely rare. We expect strong interest and anticipate a quick sale.
 
@@ -371,32 +427,37 @@ The EstateIQ Team`;
 
   if (prompt.includes("ad") || prompt.includes("Facebook ad")) {
     return `VARIATION: 1
-HEADLINE: Nairobi Dream Home
-PRIMARY TEXT: Discover this stunning property in Nairobi's prime neighborhood. Modern finishes, 3 bedrooms, secure compound. 8-12% annual appreciation. Book a viewing today!
+HEADLINE: ${mainCity} Dream Home
+PRIMARY TEXT: Discover this stunning property in ${mainCity}'s prime neighborhood. Modern finishes, 3 bedrooms, secure compound. Strong annual appreciation. Book a viewing today!
 DESCRIPTION: Book Viewing Now
 
 ===AD===
 VARIATION: 2
-HEADLINE: Invest in Nairobi
-PRIMARY TEXT: Premium property in Kenya's fastest-growing area. Below market price, move-in ready, strong rental yields. Don't miss this opportunity!
+HEADLINE: Invest in ${countryName}
+PRIMARY TEXT: Premium property in ${countryName}'s fastest-growing area. Below market price, move-in ready, strong rental yields. Don't miss this opportunity!
 DESCRIPTION: View Property Details
 
 ===AD===
 VARIATION: 3
 HEADLINE: Your Next Home Awaits
-PRIMARY TEXT: Beautiful family home in prime Nairobi location. Modern design, 24/7 security, near schools & malls. Priced to sell fast!
+PRIMARY TEXT: Beautiful family home in prime ${mainCity} location. Modern design, 24/7 security, near schools & malls. Priced to sell fast!
 DESCRIPTION: Schedule a Tour`;
   }
 
-  return `This is professionally crafted real estate marketing content generated for the Kenyan market. Contact us for more details about this exceptional property opportunity in Nairobi.`;
+  return `This is professionally crafted real estate marketing content generated for the ${countryName} market. Contact us for more details about this exceptional property opportunity in ${mainCity}.`;
 }
 
 export async function generatePropertyDescription(
   data: PropertyData,
-  language: string = "english"
+  language: string = "english",
+  countryCode: string = "kenya"
 ): Promise<GeneratedResult[]> {
-  const context = buildPropertyContext(data);
-  const langNote = language === "swahili" ? " Generate ALL content in Swahili (Kiswahili)." : "";
+  const context = buildPropertyContext(data, countryCode);
+  const country = getCountryConfig(countryCode);
+  const countryName = country?.name || "Kenya";
+  const langNote = language !== "english"
+    ? ` Generate ALL content in ${language.charAt(0).toUpperCase() + language.slice(1)}.`
+    : "";
 
   const prompt = `Generate 3 versions of a property description for the following property:
 
@@ -413,13 +474,13 @@ Format each version EXACTLY as:
 VERSION: [Short|Medium|Long]
 [content for this version]`;
 
-  const response = await callDeepSeek(prompt);
+  const response = await callDeepSeek(prompt, countryCode);
   const versions = response.split("===VERSION===").filter(Boolean);
 
   const labels = ["Short", "Medium", "Long"];
   return labels.map((label, i) => ({
     title: `${data.title} — ${label} Description`,
-    body: versions[i]?.trim() || `Professional ${label.toLowerCase()} description for ${data.title}. Contact us for more details and to schedule a viewing.`,
+    body: versions[i]?.trim() || `Professional ${label.toLowerCase()} description for ${data.title} in ${data.location}. Contact us for more details and to schedule a viewing.`,
     contentType: "description",
     language,
   }));
@@ -427,10 +488,16 @@ VERSION: [Short|Medium|Long]
 
 export async function generateSocialMediaPosts(
   data: PropertyData,
-  language: string = "english"
+  language: string = "english",
+  countryCode: string = "kenya"
 ): Promise<GeneratedResult[]> {
-  const context = buildPropertyContext(data);
-  const langNote = language === "swahili" ? " Generate ALL content in Swahili (Kiswahili)." : "";
+  const context = buildPropertyContext(data, countryCode);
+  const country = getCountryConfig(countryCode);
+  const countryName = country?.name || "Kenya";
+  const hashtags = getCountryHashtags(countryCode).slice(0, 3).join(" ");
+  const langNote = language !== "english"
+    ? ` Generate ALL content in ${language.charAt(0).toUpperCase() + language.slice(1)}.`
+    : "";
 
   const prompt = `Generate social media posts for this property:
 
@@ -451,7 +518,7 @@ Format each EXACTLY as:
 POST: [Platform — Focus]
 [content]`;
 
-  const response = await callDeepSeek(prompt);
+  const response = await callDeepSeek(prompt, countryCode);
   const posts = response.split("===POST===").filter(Boolean);
 
   const configs = [
@@ -464,7 +531,7 @@ POST: [Platform — Focus]
 
   return configs.map((cfg, i) => ({
     title: `${data.title} — ${cfg.label}`,
-    body: posts[i]?.trim() || `Check out ${data.title} in ${data.location}! Amazing property. #NairobiProperties #KenyaRealEstate`,
+    body: posts[i]?.trim() || `Check out ${data.title} in ${data.location}! Amazing property in ${countryName}. ${hashtags}`,
     contentType: "social_post",
     platform: cfg.platform,
     language,
@@ -473,10 +540,14 @@ POST: [Platform — Focus]
 
 export async function generateWhatsAppMessages(
   data: PropertyData,
-  language: string = "english"
+  language: string = "english",
+  countryCode: string = "kenya"
 ): Promise<GeneratedResult[]> {
-  const context = buildPropertyContext(data);
-  const langNote = language === "swahili" ? " Generate ALL content in Swahili (Kiswahili)." : "";
+  const context = buildPropertyContext(data, countryCode);
+  const priceFormatted = formatPrice(countryCode, data.price);
+  const langNote = language !== "english"
+    ? ` Generate ALL content in ${language.charAt(0).toUpperCase() + language.slice(1)}.`
+    : "";
 
   const prompt = `Generate WhatsApp marketing messages for this property:
 
@@ -489,19 +560,19 @@ Generate exactly 3 messages separated by "===MSG===":
 2. Casual — Friendly and approachable
 3. Urgent — Time-sensitive with strong CTA
 
-Keep messages short and punchy (WhatsApp style). Include call-to-action. Mention price as KES ${data.price.toLocaleString()}.
+Keep messages short and punchy (WhatsApp style). Include call-to-action. Mention price as ${priceFormatted}.
 
 Format each EXACTLY as:
 TONE: [Professional|Casual|Urgent]
 [content]`;
 
-  const response = await callDeepSeek(prompt);
+  const response = await callDeepSeek(prompt, countryCode);
   const messages = response.split("===MSG===").filter(Boolean);
 
   const tones = ["Professional", "Casual", "Urgent"];
   return tones.map((tone, i) => ({
     title: `${data.title} — WhatsApp ${tone}`,
-    body: messages[i]?.trim() || `Hi! Check out this ${data.propertyType} in ${data.location} at KES ${data.price.toLocaleString()}. DM for details!`,
+    body: messages[i]?.trim() || `Hi! Check out this ${data.propertyType} in ${data.location} at ${priceFormatted}. DM for details!`,
     contentType: "whatsapp_msg",
     platform: "whatsapp",
     language,
@@ -510,10 +581,13 @@ TONE: [Professional|Casual|Urgent]
 
 export async function generateEmailCampaign(
   data: PropertyData,
-  language: string = "english"
+  language: string = "english",
+  countryCode: string = "kenya"
 ): Promise<GeneratedResult[]> {
-  const context = buildPropertyContext(data);
-  const langNote = language === "swahili" ? " Generate ALL content in Swahili (Kiswahili)." : "";
+  const context = buildPropertyContext(data, countryCode);
+  const langNote = language !== "english"
+    ? ` Generate ALL content in ${language.charAt(0).toUpperCase() + language.slice(1)}.`
+    : "";
 
   const prompt = `Generate email marketing content for this property:
 
@@ -535,7 +609,7 @@ TYPE: [New Listing|Open House|Price Drop]
 SUBJECT: [subject]
 [body]`;
 
-  const response = await callDeepSeek(prompt);
+  const response = await callDeepSeek(prompt, countryCode);
   const emails = response.split("===EMAIL===").filter(Boolean);
 
   const types = ["New Listing", "Open House", "Price Drop"];
@@ -550,10 +624,16 @@ SUBJECT: [subject]
 
 export async function generateAdCopy(
   data: PropertyData,
-  language: string = "english"
+  language: string = "english",
+  countryCode: string = "kenya"
 ): Promise<GeneratedResult[]> {
-  const context = buildPropertyContext(data);
-  const langNote = language === "swahili" ? " Generate ALL content in Swahili (Kiswahili)." : "";
+  const context = buildPropertyContext(data, countryCode);
+  const country = getCountryConfig(countryCode);
+  const mainCity = country?.cities[0]?.name || "Nairobi";
+  const countryName = country?.name || "Kenya";
+  const langNote = language !== "english"
+    ? ` Generate ALL content in ${language.charAt(0).toUpperCase() + language.slice(1)}.`
+    : "";
 
   const prompt = `Generate Facebook ad copy for this property:
 
@@ -575,12 +655,12 @@ HEADLINE: [headline]
 PRIMARY TEXT: [primary text]
 DESCRIPTION: [description]`;
 
-  const response = await callDeepSeek(prompt);
+  const response = await callDeepSeek(prompt, countryCode);
   const ads = response.split("===AD===").filter(Boolean);
 
   return [1, 2, 3].map((num, i) => ({
     title: `${data.title} — Facebook Ad Variation ${num}`,
-    body: ads[i]?.trim() || `HEADLINE: ${data.title.substring(0, 40)}\nPRIMARY TEXT: Beautiful ${data.propertyType} in ${data.location}. View now!\nDESCRIPTION: Nairobi Real Estate`,
+    body: ads[i]?.trim() || `HEADLINE: ${data.title.substring(0, 40)}\nPRIMARY TEXT: Beautiful ${data.propertyType} in ${data.location}. View now!\nDESCRIPTION: ${countryName} Real Estate`,
     contentType: "ad_copy",
     platform: "facebook",
     language,
@@ -590,21 +670,22 @@ DESCRIPTION: [description]`;
 export async function generateContent(
   propertyData: PropertyData,
   contentType: string,
-  language: string = "english"
+  language: string = "english",
+  countryCode: string = "kenya"
 ): Promise<GeneratedResult[]> {
   switch (contentType) {
     case "description":
-      return generatePropertyDescription(propertyData, language);
+      return generatePropertyDescription(propertyData, language, countryCode);
     case "social_post":
-      return generateSocialMediaPosts(propertyData, language);
+      return generateSocialMediaPosts(propertyData, language, countryCode);
     case "whatsapp_msg":
-      return generateWhatsAppMessages(propertyData, language);
+      return generateWhatsAppMessages(propertyData, language, countryCode);
     case "email_campaign":
-      return generateEmailCampaign(propertyData, language);
+      return generateEmailCampaign(propertyData, language, countryCode);
     case "ad_copy":
-      return generateAdCopy(propertyData, language);
+      return generateAdCopy(propertyData, language, countryCode);
     default:
-      return generatePropertyDescription(propertyData, language);
+      return generatePropertyDescription(propertyData, language, countryCode);
   }
 }
 

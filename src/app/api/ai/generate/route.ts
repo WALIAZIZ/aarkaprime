@@ -8,12 +8,13 @@ interface GenerateBody {
   contentType: string;
   language: string;
   userId: string;
+  countryCode?: string;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body: GenerateBody = await req.json();
-    const { propertyId, contentType, language, userId } = body;
+    const { propertyId, contentType, language, userId, countryCode: bodyCountryCode } = body;
 
     // Validate required fields
     if (!propertyId || !contentType || !userId) {
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Resolve country code: body > user profile > fallback to "kenya"
+    const countryCode = bodyCountryCode || user.country || "kenya";
 
     if (user.monthlyGenerationsUsed >= user.monthlyGenerationsLimit) {
       return NextResponse.json(
@@ -77,7 +81,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Generate content via AI engine
-    const results = await generateContent(propertyData, contentType, language || "english");
+    const results = await generateContent(propertyData, contentType, language || "english", countryCode);
 
     // Save each generated result to DB
     const savedContent = [];

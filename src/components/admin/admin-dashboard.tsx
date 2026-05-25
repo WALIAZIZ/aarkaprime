@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { COUNTRIES_SORTED, COUNTRIES } from "@/lib/countries";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,21 +81,21 @@ interface AdminLead {
 
 interface AdminData {
   stats: AdminStats;
-  usersByCountry: { kenya: number; ethiopia: number };
+  usersByCountry: Record<string, number>;
   usersByPlan: { free: number; starter: number; pro: number; enterprise: number };
   users: AdminUser[];
   recentLeads: AdminLead[];
 }
 
-const countryFlags: Record<string, string> = {
-  kenya: "🇰🇪",
-  ethiopia: "🇪🇹",
-};
+function getCountryFlag(code: string): string {
+  const c = COUNTRIES.find((c) => c.code === code);
+  return c?.flag || "\u{1F30D}";
+}
 
-const countryLabels: Record<string, string> = {
-  kenya: "Kenya",
-  ethiopia: "Ethiopia",
-};
+function getCountryName(code: string): string {
+  const c = COUNTRIES.find((c) => c.code === code);
+  return c?.name || code;
+}
 
 const planColors: Record<string, string> = {
   free: "bg-gray-100 text-gray-700",
@@ -208,7 +209,12 @@ export function AdminDashboard() {
   }
 
   const totalUsers = data.stats.totalUsers;
-  const maxCountryVal = Math.max(data.usersByCountry.kenya, data.usersByCountry.ethiopia, 1);
+  // Gather all country codes present in the data, sorted alphabetically
+  const countryEntries = COUNTRIES_SORTED.map((c) => ({
+    code: c.code,
+    count: data.usersByCountry[c.code] ?? 0,
+  })).filter((e) => e.count > 0);
+  const maxCountryVal = Math.max(...countryEntries.map((e) => e.count), 1);
 
   return (
     <div className="space-y-6 p-6">
@@ -262,28 +268,30 @@ export function AdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {(["kenya", "ethiopia"] as const).map((c) => {
-              const count = data.usersByCountry[c];
-              const pct = totalUsers > 0 ? Math.round((count / totalUsers) * 100) : 0;
+            {countryEntries.map((entry) => {
+              const pct = totalUsers > 0 ? Math.round((entry.count / totalUsers) * 100) : 0;
               return (
-                <div key={c} className="space-y-1.5">
+                <div key={entry.code} className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium">
-                      {countryFlags[c]} {countryLabels[c]}
+                      {getCountryFlag(entry.code)} {getCountryName(entry.code)}
                     </span>
                     <span className="text-muted-foreground">
-                      {count} user{count !== 1 ? "s" : ""} ({pct}%)
+                      {entry.count} user{entry.count !== 1 ? "s" : ""} ({pct}%)
                     </span>
                   </div>
                   <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                     <div
                       className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                      style={{ width: `${(count / maxCountryVal) * 100}%` }}
+                      style={{ width: `${(entry.count / maxCountryVal) * 100}%` }}
                     />
                   </div>
                 </div>
               );
             })}
+            {countryEntries.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No users registered yet</p>
+            )}
           </CardContent>
         </Card>
 
@@ -375,9 +383,9 @@ export function AdminDashboard() {
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="inline-flex items-center gap-1">
-                          {countryFlags[user.country || "kenya"]}
+                          {getCountryFlag(user.country || "kenya")}
                           <span className="hidden sm:inline text-xs">
-                            {countryLabels[user.country || "kenya"]}
+                            {getCountryName(user.country || "kenya")}
                           </span>
                         </span>
                       </TableCell>

@@ -6,6 +6,11 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAppStore } from '@/store/app-store';
+import {
+  getCountryConfig,
+  getCountryCities,
+  getNeighborhoods,
+} from '@/lib/countries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,6 +96,11 @@ export function AddPropertyForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(isEditMode);
 
+  // Country-aware location data
+  const userCountryCode = user?.country || 'kenya';
+  const countryConfig = getCountryConfig(userCountryCode);
+  const cities = getCountryCities(userCountryCode);
+
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertySchema),
     defaultValues: {
@@ -118,6 +128,10 @@ export function AddPropertyForm() {
   } = form;
 
   const selectedFeatures = watch('features') ?? [];
+  const selectedLocation = watch('location');
+  const neighborhoods = selectedLocation
+    ? getNeighborhoods(userCountryCode, selectedLocation)
+    : [];
 
   // Fetch existing property data for edit mode
   const fetchProperty = useCallback(async () => {
@@ -323,13 +337,28 @@ export function AddPropertyForm() {
             {/* Location */}
             <div className="grid gap-2">
               <Label htmlFor="location">
-                Location <span className="text-red-500">*</span>
+                City <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="location"
-                placeholder="e.g., Karen, Nairobi"
-                {...register('location')}
-                aria-invalid={!!errors.location}
+              <Controller
+                name="location"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger className="w-full" id="location">
+                      <SelectValue placeholder="Select city..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               />
               {errors.location && (
                 <p className="text-sm text-destructive">
@@ -341,10 +370,32 @@ export function AddPropertyForm() {
             {/* Neighborhood */}
             <div className="grid gap-2">
               <Label htmlFor="neighborhood">Neighborhood</Label>
-              <Input
-                id="neighborhood"
-                placeholder="e.g., Karen Heights"
-                {...register('neighborhood')}
+              <Controller
+                name="neighborhood"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || ''}
+                    onValueChange={(val) => field.onChange(val === '__none__' ? '' : val)}
+                    disabled={!selectedLocation}
+                  >
+                    <SelectTrigger className="w-full" id="neighborhood">
+                      <SelectValue placeholder={
+                        selectedLocation
+                          ? 'Select neighborhood...'
+                          : 'Select a city first'
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— None —</SelectItem>
+                      {neighborhoods.map((n) => (
+                        <SelectItem key={n} value={n}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               />
               <p className="text-xs text-muted-foreground">Optional</p>
             </div>
@@ -361,7 +412,7 @@ export function AddPropertyForm() {
               {/* Price */}
               <div className="grid gap-2">
                 <Label htmlFor="price">
-                  Price (KES) <span className="text-red-500">*</span>
+                  Price ({countryConfig?.currencyCode || 'KES'}) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="price"
