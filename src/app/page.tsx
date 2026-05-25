@@ -38,6 +38,9 @@ import { LeadsTable } from "@/components/leads/leads-table";
 // Settings
 import { SettingsPage } from "@/components/settings/settings-page";
 
+// Admin
+import { AdminDashboard } from "@/components/admin/admin-dashboard";
+
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
@@ -215,6 +218,8 @@ export default function Home() {
         return <LeadsPage />;
       case "settings":
         return <SettingsPageView />;
+      case "admin":
+        return <AdminDashboard />;
       case "dashboard":
       default:
         return <DashboardPage />;

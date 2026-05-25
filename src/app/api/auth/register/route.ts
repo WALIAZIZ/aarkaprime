@@ -6,6 +6,7 @@ interface RegisterBody {
   name: string;
   email: string;
   company?: string;
+  country?: string;
   password: string;
 }
 
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       email,
       name,
       company: company || null,
+      country: body.country || "kenya",
       password: hashedPassword,
     });
 
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           name: user.name,
           company: user.company,
+          country: (user as Record<string, unknown>).country as string || "kenya",
           role: user.role,
           plan: user.plan,
           monthlyGenerationsUsed: user.monthlyGenerationsUsed,

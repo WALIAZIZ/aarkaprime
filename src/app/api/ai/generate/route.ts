@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       bedrooms: property.bedrooms,
       bathrooms: property.bathrooms,
       areaSqm: property.areaSqm || undefined,
-      features: JSON.parse(property.features || "[]"),
+      features: property.features ? property.features.split(",").map(f => f.trim()) : [],
       description: property.description || undefined,
     };
 

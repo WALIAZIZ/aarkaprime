@@ -12,6 +12,7 @@ model User {
   email                 String   @unique
   name                  String?
   company               String?
+  country               String   @default("kenya")
   password              String
   role                  String   @default("user")
   plan                  String   @default("free")

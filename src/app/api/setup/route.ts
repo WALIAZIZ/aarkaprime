@@ -13,6 +13,7 @@ export async function GET() {
           "email" TEXT NOT NULL,
           "name" TEXT,
           "company" TEXT,
+          "country" TEXT NOT NULL DEFAULT 'kenya',
           "password" TEXT NOT NULL,
           "role" TEXT NOT NULL DEFAULT 'user',
           "plan" TEXT NOT NULL DEFAULT 'free',

@@ -12,6 +12,7 @@ import {
   LogOut,
   Building,
   X,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore, type AppView } from '@/store/app-store';
@@ -31,6 +32,7 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   view: AppView;
+  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -38,6 +40,7 @@ const navItems: NavItem[] = [
   { label: 'Properties', icon: Building2, view: 'properties' },
   { label: 'Generate Content', icon: Sparkles, view: 'generate' },
   { label: 'Leads', icon: Users, view: 'leads' },
+  { label: 'Admin Panel', icon: Shield, view: 'admin', adminOnly: true },
   { label: 'Settings', icon: Settings, view: 'settings' },
 ];
 
@@ -51,6 +54,7 @@ const viewTitles: Record<string, string> = {
   leads: 'Leads',
   settings: 'Settings',
   pricing: 'Pricing',
+  admin: 'Admin Panel',
 };
 
 const planColors: Record<string, string> = {
@@ -60,12 +64,21 @@ const planColors: Record<string, string> = {
   enterprise: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
 };
 
+const countryFlags: Record<string, string> = {
+  kenya: '🇰🇪',
+  ethiopia: '🇪🇹',
+};
+
 function SidebarNavContent({
   onItemClick,
 }: {
   onItemClick?: () => void;
 }) {
   const { view, setView, user } = useAppStore();
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.adminOnly || user?.role === 'admin'
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -84,7 +97,7 @@ function SidebarNavContent({
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = view === item.view;
             const Icon = item.icon;
             return (
@@ -97,7 +110,9 @@ function SidebarNavContent({
                   className={cn(
                     'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                      ? item.adminOnly
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-emerald-600 text-white shadow-sm'
                       : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-gray-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-400'
                   )}
                 >
@@ -130,15 +145,20 @@ function SidebarNavContent({
                 <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                   {user.name || 'User'}
                 </p>
-                <Badge
-                  variant="secondary"
-                  className={cn(
-                    'mt-0.5 text-[10px] uppercase font-semibold',
-                    planColors[user.plan?.toLowerCase() ?? 'free']
+                <div className="flex items-center gap-1.5">
+                  {user.country && (
+                    <span className="text-xs">{countryFlags[user.country] || ''}</span>
                   )}
-                >
-                  {user.plan || 'Free'}
-                </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      'mt-0.5 text-[10px] uppercase font-semibold',
+                      planColors[user.plan?.toLowerCase() ?? 'free']
+                    )}
+                  >
+                    {user.plan || 'Free'}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>
@@ -213,6 +233,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </h1>
 
           <div className="ml-auto flex items-center gap-3">
+            {/* Country Flag */}
+            {user?.country && (
+              <span className="hidden sm:inline text-lg" title={user.country}>
+                {countryFlags[user.country] || ''}
+              </span>
+            )}
+
             {/* Plan Badge */}
             {user && (
               <Badge

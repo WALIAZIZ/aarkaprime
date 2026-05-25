@@ -32,6 +32,7 @@ interface SignInResponse {
     email: string;
     name: string | null;
     company: string | null;
+    country?: string;
     role: string;
     plan: string;
     monthlyGenerationsUsed: number;

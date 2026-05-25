@@ -12,7 +12,8 @@ export type AppView =
   | "generate"
   | "leads"
   | "settings"
-  | "pricing";
+  | "pricing"
+  | "admin";
 
 export interface Toast {
   id: string;
@@ -26,6 +27,7 @@ export interface AuthUser {
   email: string;
   name: string | null;
   company: string | null;
+  country?: string;
   role: string;
   plan: string;
   monthlyGenerationsUsed?: number;

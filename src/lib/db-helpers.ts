@@ -6,6 +6,7 @@ export async function createUser(data: {
   email: string;
   name: string;
   company?: string;
+  country?: string;
   password: string;
 }): Promise<User> {
   return db.user.create({ data });

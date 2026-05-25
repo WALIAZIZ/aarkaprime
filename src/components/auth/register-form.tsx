@@ -1,15 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Mail, Lock, User, Building2 } from "lucide-react";
+import { Loader2, Mail, Lock, User, Building2, Globe } from "lucide-react";
 
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -24,6 +31,9 @@ const registerSchema = z
     name: z.string().min(1, "Name is required"),
     email: z.string().email("Please enter a valid email address"),
     company: z.string().optional(),
+    country: z.enum(["kenya", "ethiopia"], {
+      required_error: "Please select a country",
+    }),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
@@ -40,6 +50,7 @@ interface RegisterResponse {
     email: string;
     name: string | null;
     company: string | null;
+    country: string;
     role: string;
     plan: string;
     monthlyGenerationsUsed: number;
@@ -56,6 +67,7 @@ export function RegisterForm() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -63,6 +75,7 @@ export function RegisterForm() {
       name: "",
       email: "",
       company: "",
+      country: "kenya",
       password: "",
       confirmPassword: "",
     },
@@ -78,6 +91,7 @@ export function RegisterForm() {
           name: data.name,
           email: data.email,
           company: data.company || undefined,
+          country: data.country,
           password: data.password,
         }),
       });
@@ -175,6 +189,41 @@ export function RegisterForm() {
                   {...register("company")}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="country">Country</Label>
+              <Controller
+                name="country"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="w-full pl-10">
+                      <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kenya">
+                        <span className="flex items-center gap-2">
+                          🇰🇪 Kenya
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="ethiopia">
+                        <span className="flex items-center gap-2">
+                          🇪🇹 Ethiopia
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.country && (
+                <p className="text-sm text-destructive">{errors.country.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">

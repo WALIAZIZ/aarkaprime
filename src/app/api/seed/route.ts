@@ -24,6 +24,7 @@ export async function POST() {
           email: "demo@estateiq.com",
           name: "Demo Agent",
           company: "Aarka Prime Realty",
+          country: "kenya",
           password: hashedPassword,
           role: "admin",
           plan: "pro",
